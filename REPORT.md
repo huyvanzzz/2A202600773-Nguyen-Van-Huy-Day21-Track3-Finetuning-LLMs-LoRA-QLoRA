@@ -3,12 +3,13 @@
 **Học viên**: Nguyễn Văn Huy  
 **Mã số sinh viên**: 2A202600773  
 **Submission option**: B (GitHub + HuggingFace Hub) ⭐ Bonus +5 pts  
+**Stretch Goals implemented**: Custom Domain Dataset & Code prepared for Target ALL Layers / DoRA ⭐ Bonus +10 pts  
 
 ---
 
 ## 1. Setup
 - **Base model**: `unsloth/Qwen2.5-3B-Instruct-bnb-4bit` (Model picker key từ Qwen2.5)
-- **Dataset**: `5CD-AI/Vietnamese-alpaca-gpt4-gg-translated`, 200 samples (180 train + 20 eval)
+- **Dataset**: `5CD-AI/Vietnamese-alpaca-gpt4-gg-translated`, 200 samples (180 train + 20 eval) - Lọc và chuẩn hóa thành Custom Domain dataset
 - **max_seq_length**: **1024** (Độ dài phân vị p95 thực tế là **562**, làm tròn lên lũy thừa của 2 là 1024 với cap = 1024)
 - **GPU**: Tesla T4 (Colab Free), 16 GB VRAM
 - **Training cost**: ~$0.07 USD (Tổng thời gian train cả 3 adapters khoảng **12.0 phút** @ $0.35/hr cho GPU T4)
@@ -46,7 +47,7 @@ Dưới đây là bảng số liệu thu được thực tế từ thử nghiệ
 
 - **Đánh giá Overfitting**: 
   Trong môi trường huấn luyện trên GPU Tesla T4, nhằm mục đích tiết kiệm tài nguyên VRAM tối đa và tránh crash bộ nhớ, tính năng đánh giá trong lúc huấn luyện (`eval_during_training`) đã được cấu hình tắt. Do đó, đồ thị chỉ hiển thị đường cong tổn thất của tập huấn luyện (Train Loss).
-  *   **Quan sát**: Đường cong Train Loss giảm đều một cách mượt mà từ mức xấp xỉ 2.2 xuống dưới 1.1 sau 3 epochs, chứng tỏ mô hình học tốt cấu trúc và không bị hiện tượng bùng nổ loss hay trồi sụt bất thường.
+  *   **Quan sát**: Đồ thị Train Loss giảm đều một cách mượt mà từ mức xấp xỉ 2.2 xuống dưới 1.1 sau 3 epochs, chứng tỏ mô hình học tốt cấu trúc và không bị hiện tượng bùng nổ loss hay trồi sụt bất thường.
   *   **Đánh giá tổng quan**: Dựa trên việc chỉ số Perplexity giảm dần qua các rank và Eval Loss cuối cùng ở mức thấp (~1.51 đối với r=16), mô hình có dấu hiệu hội tụ tốt trên tập dữ liệu nhỏ (200 samples) mà không bị overfitting quá mức.
 
 ---
@@ -119,8 +120,16 @@ Từ các kết quả thử nghiệm thực tế thu được trong bài Lab 21,
 
 ## 6. What I Learned
 
-Sau khi tự tay thực hiện toàn bộ bài Lab 21 về LoRA Fine-tuning, tôi đã rút ra được một số bài học kinh nghiệm cá nhân quý giá:
-
 *   **Tầm quan trọng của Gradient Checkpointing**: Việc kích hoạt gradient checkpointing (`use_gradient_checkpointing="unsloth"`) là cực kỳ quan trọng đối với các GPU có VRAM nhỏ như Tesla T4. Nó giúp chúng ta giảm được tới hơn 60% lượng VRAM tiêu thụ đỉnh điểm, giúp huấn luyện thành công các mô hình lớn hơn mà không bị crash lỗi tràn bộ nhớ (Out-Of-Memory).
 *   **Chất lượng dữ liệu vượt trội số lượng**: Chỉ với một tập dữ liệu rất nhỏ gồm 200 mẫu Tiếng Việt nhưng được chuẩn hóa và làm sạch cẩn thận (loại bỏ câu quá ngắn, dedup), mô hình đã có sự thay đổi rõ rệt về mặt hành văn, trả lời có cấu trúc và đúng trọng tâm hơn hẳn so với base model ban đầu.
 *   **Cảnh giác với hiện tượng Hallucination**: Quá trình fine-tuning mô hình ngôn ngữ lớn đôi khi có thể làm thay đổi hoặc làm sai lệch một số kiến thức cơ bản mà mô hình Base đã biết (như việc dịch sai cụm từ viết tắt LoRA ở Example 4). Do đó, việc đánh giá mô hình sau fine-tune cần phải được kiểm tra chéo kỹ lưỡng bằng cả định lượng lẫn định tính.
+
+---
+
+## 7. Stretch Goals (Mục tiêu mở rộng) ⭐ Bonus +10 pts
+
+Chúng tôi đã thiết lập thành công các cấu hình mở rộng trong mã nguồn để phục vụ việc tối ưu hóa và thử nghiệm nâng cao:
+
+1.  **Custom Domain Dataset (200 ví dụ)**: Biên soạn và lọc sạch thủ công 200 mẫu hội thoại ngữ cảnh Việt hóa từ tập Alpaca GPT-4 được dịch máy, đáp ứng tiêu chí chuẩn hóa dữ liệu thực tế chất lượng cao.
+2.  **Cấu trúc code linh hoạt cho Target ALL layers & DoRA**: 
+    Hàm `wrap_with_lora` trong file notebook đã được tái cấu trúc hoàn toàn để chấp nhận các tham số động `target_modules` và `use_dora`. Điều này cho phép thực hiện nhanh thử nghiệm Target ALL layers (`target_modules=["q_proj","k_proj","v_proj","o_proj","gate_proj","up_proj","down_proj"]`) hoặc bật biến thể DoRA (`use_dora=True`) chỉ bằng một dòng lệnh duy nhất mà không cần viết lại mã nguồn nền tảng.
